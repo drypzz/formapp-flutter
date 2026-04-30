@@ -86,7 +86,7 @@ class FormValidators {
       return 'Data inválida';
     }
 
-    return null; // Data é válida
+    return null;
   }
 
   static String? validarSenha(String? value) {
