@@ -18,7 +18,7 @@ class MyApp extends StatelessWidget {
         return MaterialApp(
           title: 'App Cadastro',
           debugShowCheckedModeBanner: false,
-          themeMode: currentMode, // Controla qual tema usar
+          themeMode: currentMode,
           theme: ThemeData(
             useMaterial3: true,
             colorScheme: ColorScheme.fromSeed(
