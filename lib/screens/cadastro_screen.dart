@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:formappflutter/main.dart';
 import 'package:mask_text_input_formatter/mask_text_input_formatter.dart';
+import '../main.dart';
 import '../validators/form_validators.dart';
 
 class CadastroScreen extends StatefulWidget {
@@ -14,7 +14,10 @@ class CadastroScreen extends StatefulWidget {
 class _CadastroScreenState extends State<CadastroScreen> {
   final _formKey = GlobalKey<FormState>();
 
-  // Controllers, FocusNodes e Máscaras (Mantidos iguais)
+  final _emailFieldKey = GlobalKey<FormFieldState>();
+  final _cpfFieldKey = GlobalKey<FormFieldState>();
+  final _dataNascimentoFieldKey = GlobalKey<FormFieldState>();
+
   final _nomeController = TextEditingController();
   final _emailController = TextEditingController();
   final _cpfController = TextEditingController();
@@ -46,8 +49,15 @@ class _CadastroScreenState extends State<CadastroScreen> {
 
   bool _termosAceitos = false;
   bool _enviando = false;
+
   bool _verificandoEmail = false;
   String? _emailErrorAsync;
+
+  bool _verificandoCpf = false;
+  String? _cpfErrorAsync;
+
+  bool _verificandoData = false;
+  String? _dataErrorAsync;
 
   final List<String> _emailsCadastrados = [
     'admin@teste.com',
@@ -55,12 +65,39 @@ class _CadastroScreenState extends State<CadastroScreen> {
     'gustavo@senac.br',
   ];
 
+  bool get _isProcessando =>
+      _enviando || _verificandoEmail || _verificandoCpf || _verificandoData;
+
   @override
   void initState() {
     super.initState();
+
     _emailFocus.addListener(() {
-      if (!_emailFocus.hasFocus && _emailController.text.isNotEmpty) {
-        _verificarEmailAssincrono(_emailController.text);
+      if (!_emailFocus.hasFocus) {
+        bool formatoValido = _emailFieldKey.currentState?.validate() ?? false;
+        if (formatoValido && _emailController.text.isNotEmpty) {
+          _verificarEmailAssincrono(_emailController.text);
+        }
+      }
+    });
+
+    _cpfFocus.addListener(() {
+      if (!_cpfFocus.hasFocus) {
+        if (_cpfController.text.isNotEmpty) {
+          _verificarCpfAssincrono(_cpfController.text);
+        } else {
+          _cpfFieldKey.currentState?.validate();
+        }
+      }
+    });
+
+    _dataNascimentoFocus.addListener(() {
+      if (!_dataNascimentoFocus.hasFocus) {
+        if (_dataNascimentoController.text.isNotEmpty) {
+          _verificarDataAssincrona(_dataNascimentoController.text);
+        } else {
+          _dataNascimentoFieldKey.currentState?.validate();
+        }
       }
     });
   }
@@ -85,29 +122,79 @@ class _CadastroScreenState extends State<CadastroScreen> {
     super.dispose();
   }
 
-  // Métodos de envio e dialog mantidos iguais
   Future<void> _verificarEmailAssincrono(String email) async {
-    setState(() => _verificandoEmail = true);
+    setState(() {
+      _verificandoEmail = true;
+      _emailErrorAsync = null;
+    });
+
     await Future.delayed(const Duration(seconds: 2));
+
     setState(() {
       _verificandoEmail = false;
       _emailErrorAsync = _emailsCadastrados.contains(email.toLowerCase())
           ? 'Este e-mail já está em uso'
           : null;
     });
+    _emailFieldKey.currentState?.validate();
   }
 
-  void _enviarFormulario() async {
+  Future<void> _verificarCpfAssincrono(String cpf) async {
+    setState(() {
+      _verificandoCpf = true;
+      _cpfErrorAsync = null;
+    });
+
+    await Future.delayed(const Duration(seconds: 2));
+
+    setState(() {
+      _verificandoCpf = false;
+      _cpfErrorAsync = FormValidators.validarCpf(cpf);
+    });
+    _cpfFieldKey.currentState?.validate();
+  }
+
+  Future<void> _verificarDataAssincrona(String data) async {
+    setState(() {
+      _verificandoData = true;
+      _dataErrorAsync = null;
+    });
+
+    await Future.delayed(const Duration(seconds: 2));
+
+    setState(() {
+      _verificandoData = false;
+      _dataErrorAsync = FormValidators.validarDataNascimento(data);
+    });
+    _dataNascimentoFieldKey.currentState?.validate();
+  }
+
+  Future<void> _enviarFormulario() async {
+    FocusScope.of(context).unfocus();
+
+    await Future.delayed(const Duration(milliseconds: 100));
+
+    if (_verificandoEmail || _verificandoCpf || _verificandoData) {
+      setState(() => _enviando = true);
+
+      while (_verificandoEmail || _verificandoCpf || _verificandoData) {
+        await Future.delayed(const Duration(milliseconds: 100));
+      }
+
+      setState(() => _enviando = false);
+    }
+
     if (!_termosAceitos) {
       _mostrarSnackBar('Você deve aceitar os termos de uso.', Colors.redAccent);
       return;
     }
 
-    if (_formKey.currentState!.validate() && _emailErrorAsync == null) {
-      setState(() => _enviando = true);
-      await Future.delayed(const Duration(seconds: 2));
-      setState(() => _enviando = false);
-      _mostrarSnackBar('Conta criada com sucesso!', Colors.green);
+    bool formValido = _formKey.currentState!.validate();
+
+    if (formValido &&
+        _emailErrorAsync == null &&
+        _cpfErrorAsync == null &&
+        _dataErrorAsync == null) {
       _mostrarDialogConfirmacao();
     } else {
       _mostrarSnackBar(
@@ -125,8 +212,7 @@ class _CadastroScreenState extends State<CadastroScreen> {
           style: const TextStyle(fontWeight: FontWeight.w600),
         ),
         backgroundColor: cor,
-        behavior:
-            SnackBarBehavior.floating, // Floating SnackBar para UX moderno
+        behavior: SnackBarBehavior.floating,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
         margin: const EdgeInsets.all(16),
       ),
@@ -136,6 +222,7 @@ class _CadastroScreenState extends State<CadastroScreen> {
   void _mostrarDialogConfirmacao() {
     showDialog(
       context: context,
+      barrierDismissible: false,
       builder: (context) => AlertDialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
         title: const Text('Confirmação de Cadastro'),
@@ -143,7 +230,7 @@ class _CadastroScreenState extends State<CadastroScreen> {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text('Verifique seus dados:'),
+            const Text('Verifique seus dados antes de enviar:'),
             const SizedBox(height: 16),
             _buildResumoItem(Icons.person, _nomeController.text),
             _buildResumoItem(Icons.email, _emailController.text),
@@ -164,21 +251,39 @@ class _CadastroScreenState extends State<CadastroScreen> {
             ),
             onPressed: () {
               Navigator.pop(context);
-              _formKey.currentState!.reset();
-              _nomeController.clear();
-              _emailController.clear();
-              _cpfController.clear();
-              _telefoneController.clear();
-              _dataNascimentoController.clear();
-              _senhaController.clear();
-              _confirmaSenhaController.clear();
-              setState(() => _termosAceitos = false);
+              _processarCadastro();
             },
-            child: const Text('Tudo Certo'),
+            child: const Text('Confirmar e Enviar'),
           ),
         ],
       ),
     );
+  }
+
+  Future<void> _processarCadastro() async {
+    setState(() => _enviando = true);
+
+    await Future.delayed(const Duration(seconds: 2));
+
+    setState(() => _enviando = false);
+
+    _mostrarSnackBar('Conta criada com sucesso!', Colors.green);
+
+    _formKey.currentState!.reset();
+    _nomeController.clear();
+    _emailController.clear();
+    _cpfController.clear();
+    _telefoneController.clear();
+    _dataNascimentoController.clear();
+    _senhaController.clear();
+    _confirmaSenhaController.clear();
+
+    setState(() {
+      _termosAceitos = false;
+      _emailErrorAsync = null;
+      _cpfErrorAsync = null;
+      _dataErrorAsync = null;
+    });
   }
 
   Widget _buildResumoItem(IconData icon, String text) {
@@ -201,7 +306,6 @@ class _CadastroScreenState extends State<CadastroScreen> {
 
   @override
   Widget build(BuildContext context) {
-
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
 
@@ -212,7 +316,6 @@ class _CadastroScreenState extends State<CadastroScreen> {
         backgroundColor: Colors.transparent,
         elevation: 0,
         actions: [
-          // Botão para alternar entre modo claro e escuro [cite: 112, 113]
           IconButton(
             icon: Icon(isDark ? Icons.light_mode : Icons.dark_mode),
             onPressed: () {
@@ -223,16 +326,13 @@ class _CadastroScreenState extends State<CadastroScreen> {
       ),
       body: SafeArea(
         child: Center(
-          // Centraliza na tela (ótimo para web/desktop)
           child: ConstrainedBox(
-            // Limita a largura máxima
             constraints: const BoxConstraints(maxWidth: 600),
             child: SingleChildScrollView(
               padding: const EdgeInsets.all(24.0),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  // Cabeçalho da Tela
                   const Icon(
                     Icons.account_circle,
                     size: 80,
@@ -252,7 +352,6 @@ class _CadastroScreenState extends State<CadastroScreen> {
                   ),
                   const SizedBox(height: 32),
 
-                  // Card do Formulário
                   Card(
                     elevation: 0,
                     color: theme.colorScheme.surface,
@@ -282,13 +381,13 @@ class _CadastroScreenState extends State<CadastroScreen> {
                             const SizedBox(height: 20),
 
                             TextFormField(
+                              key: _emailFieldKey,
                               controller: _emailController,
                               focusNode: _emailFocus,
                               decoration: InputDecoration(
                                 labelText: 'E-mail',
                                 hintText: 'exemplo@dominio.com',
                                 prefixIcon: const Icon(Icons.email_outlined),
-                                errorText: _emailErrorAsync,
                                 suffixIcon: _verificandoEmail
                                     ? const Padding(
                                         padding: EdgeInsets.all(12.0),
@@ -305,11 +404,21 @@ class _CadastroScreenState extends State<CadastroScreen> {
                               keyboardType: TextInputType.emailAddress,
                               textInputAction: TextInputAction.next,
                               onFieldSubmitted: (_) => _cpfFocus.requestFocus(),
-                              validator: FormValidators.validarEmail,
+                              onChanged: (value) {
+                                if (_emailErrorAsync != null) {
+                                  setState(() => _emailErrorAsync = null);
+                                  _emailFieldKey.currentState?.validate();
+                                }
+                              },
+                              validator: (val) {
+                                if (_emailErrorAsync != null) {
+                                  return _emailErrorAsync;
+                                }
+                                return FormValidators.validarEmail(val);
+                              },
                             ),
                             const SizedBox(height: 20),
 
-                            // CPF e Telefone na mesma linha em telas maiores, ou em coluna no celular
                             LayoutBuilder(
                               builder: (context, constraints) {
                                 if (constraints.maxWidth > 400) {
@@ -319,20 +428,52 @@ class _CadastroScreenState extends State<CadastroScreen> {
                                     children: [
                                       Expanded(
                                         child: TextFormField(
+                                          key: _cpfFieldKey,
                                           controller: _cpfController,
                                           focusNode: _cpfFocus,
                                           inputFormatters: [_cpfMask],
-                                          decoration: const InputDecoration(
+                                          decoration: InputDecoration(
                                             labelText: 'CPF',
-                                            prefixIcon: Icon(
+                                            prefixIcon: const Icon(
                                               Icons.badge_outlined,
                                             ),
+                                            suffixIcon: _verificandoCpf
+                                                ? const Padding(
+                                                    padding: EdgeInsets.all(
+                                                      12.0,
+                                                    ),
+                                                    child: SizedBox(
+                                                      width: 20,
+                                                      height: 20,
+                                                      child:
+                                                          CircularProgressIndicator(
+                                                            strokeWidth: 2,
+                                                          ),
+                                                    ),
+                                                  )
+                                                : null,
                                           ),
                                           keyboardType: TextInputType.number,
                                           textInputAction: TextInputAction.next,
                                           onFieldSubmitted: (_) =>
                                               _telefoneFocus.requestFocus(),
-                                          validator: FormValidators.validarCpf,
+                                          onChanged: (value) {
+                                            if (_cpfErrorAsync != null) {
+                                              setState(
+                                                () => _cpfErrorAsync = null,
+                                              );
+                                              _cpfFieldKey.currentState
+                                                  ?.validate();
+                                            }
+                                          },
+                                          validator: (val) {
+                                            if (_cpfErrorAsync != null) {
+                                              return _cpfErrorAsync;
+                                            }
+                                            return FormValidators.validarCpf(
+                                              val,
+                                            );
+                                          },
                                         ),
                                       ),
                                       const SizedBox(width: 16),
@@ -362,20 +503,48 @@ class _CadastroScreenState extends State<CadastroScreen> {
                                   return Column(
                                     children: [
                                       TextFormField(
+                                        key: _cpfFieldKey,
                                         controller: _cpfController,
                                         focusNode: _cpfFocus,
                                         inputFormatters: [_cpfMask],
-                                        decoration: const InputDecoration(
+                                        decoration: InputDecoration(
                                           labelText: 'CPF',
-                                          prefixIcon: Icon(
+                                          prefixIcon: const Icon(
                                             Icons.badge_outlined,
                                           ),
+                                          suffixIcon: _verificandoCpf
+                                              ? const Padding(
+                                                  padding: EdgeInsets.all(12.0),
+                                                  child: SizedBox(
+                                                    width: 20,
+                                                    height: 20,
+                                                    child:
+                                                        CircularProgressIndicator(
+                                                          strokeWidth: 2,
+                                                        ),
+                                                  ),
+                                                )
+                                              : null,
                                         ),
                                         keyboardType: TextInputType.number,
                                         textInputAction: TextInputAction.next,
                                         onFieldSubmitted: (_) =>
                                             _telefoneFocus.requestFocus(),
-                                        validator: FormValidators.validarCpf,
+                                        onChanged: (value) {
+                                          if (_cpfErrorAsync != null) {
+                                            setState(
+                                              () => _cpfErrorAsync = null,
+                                            );
+                                            _cpfFieldKey.currentState
+                                                ?.validate();
+                                          }
+                                        },
+                                        validator: (val) {
+                                          if (_cpfErrorAsync != null) {
+                                            return _cpfErrorAsync;
+                                          }
+                                          return FormValidators.validarCpf(val);
+                                        },
                                       ),
                                       const SizedBox(height: 20),
                                       TextFormField(
@@ -403,19 +572,48 @@ class _CadastroScreenState extends State<CadastroScreen> {
                             const SizedBox(height: 20),
 
                             TextFormField(
+                              key: _dataNascimentoFieldKey,
                               controller: _dataNascimentoController,
                               focusNode: _dataNascimentoFocus,
                               inputFormatters: [_dataNascimentoMask],
-                              decoration: const InputDecoration(
+                              decoration: InputDecoration(
                                 labelText: 'Data de Nascimento',
                                 hintText: 'DD/MM/AAAA',
-                                prefixIcon: Icon(Icons.calendar_today_outlined),
+                                prefixIcon: const Icon(
+                                  Icons.calendar_today_outlined,
+                                ),
+                                suffixIcon: _verificandoData
+                                    ? const Padding(
+                                        padding: EdgeInsets.all(12.0),
+                                        child: SizedBox(
+                                          width: 20,
+                                          height: 20,
+                                          child: CircularProgressIndicator(
+                                            strokeWidth: 2,
+                                          ),
+                                        ),
+                                      )
+                                    : null,
                               ),
                               keyboardType: TextInputType.datetime,
                               textInputAction: TextInputAction.next,
                               onFieldSubmitted: (_) =>
                                   _senhaFocus.requestFocus(),
-                              validator: FormValidators.validarDataNascimento,
+                              onChanged: (value) {
+                                if (_dataErrorAsync != null) {
+                                  setState(() => _dataErrorAsync = null);
+                                  _dataNascimentoFieldKey.currentState
+                                      ?.validate();
+                                }
+                              },
+                              validator: (val) {
+                                if (_dataErrorAsync != null) {
+                                  return _dataErrorAsync;
+                                }
+                                return FormValidators.validarDataNascimento(
+                                  val,
+                                );
+                              },
                             ),
                             const SizedBox(height: 20),
 
@@ -458,7 +656,6 @@ class _CadastroScreenState extends State<CadastroScreen> {
                   ),
                   const SizedBox(height: 16),
 
-                  // Checkbox e Termos
                   Row(
                     children: [
                       Checkbox(
@@ -482,9 +679,8 @@ class _CadastroScreenState extends State<CadastroScreen> {
                   ),
                   const SizedBox(height: 24),
 
-                  // Botão de Cadastrar
                   SizedBox(
-                    height: 56, // Touch target maior e confortável
+                    height: 56,
                     child: FilledButton.icon(
                       style: FilledButton.styleFrom(
                         shape: RoundedRectangleBorder(
@@ -492,11 +688,11 @@ class _CadastroScreenState extends State<CadastroScreen> {
                         ),
                         elevation: 0,
                       ),
-                      onPressed: _enviando ? null : _enviarFormulario,
-                      icon: _enviando
+                      onPressed: _isProcessando ? null : _enviarFormulario,
+                      icon: _isProcessando
                           ? const SizedBox.shrink()
                           : const Icon(Icons.check_circle_outline),
-                      label: _enviando
+                      label: _isProcessando
                           ? const SizedBox(
                               height: 24,
                               width: 24,

@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'screens/cadastro_screen.dart';
 
-// Notificador global para controlar o modo do tema
 final ValueNotifier<ThemeMode> themeNotifier = ValueNotifier(ThemeMode.light);
 
 void main() {
@@ -20,7 +19,6 @@ class MyApp extends StatelessWidget {
           title: 'App Cadastro',
           debugShowCheckedModeBanner: false,
           themeMode: currentMode, // Controla qual tema usar
-          // TEMA CLARO
           theme: ThemeData(
             useMaterial3: true,
             colorScheme: ColorScheme.fromSeed(
@@ -32,7 +30,6 @@ class MyApp extends StatelessWidget {
             inputDecorationTheme: _buildInputTheme(Brightness.light),
           ),
 
-          // TEMA ESCURO
           darkTheme: ThemeData(
             useMaterial3: true,
             colorScheme: ColorScheme.fromSeed(
